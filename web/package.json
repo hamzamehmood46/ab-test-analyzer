@@ -1,0 +1,6 @@
+{
+  "name": "ab-test-analyzer-web",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test stats.test.mjs" }
+}

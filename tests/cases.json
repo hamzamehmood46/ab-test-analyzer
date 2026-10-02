@@ -1,0 +1,22 @@
+{
+  "_note": "Expected values were worked out by hand from the formulas (pooled z, unpooled CI). Both the Python and JavaScript implementations must reproduce them.",
+  "ztest": [
+    {
+      "name": "significant lift, 10% to 12%",
+      "args": [200, 2000, 240, 2000],
+      "z": 2.0213, "p": 0.0432, "ci_low": 0.0006, "ci_high": 0.0394, "significant": true
+    },
+    {
+      "name": "no evidence of a lift, 10% vs 10.5%",
+      "args": [100, 1000, 105, 1000],
+      "z": 0.3686, "p": 0.7124, "ci_low": -0.0216, "ci_high": 0.0316, "significant": false
+    }
+  ],
+  "sample_size": [
+    { "name": "10% baseline, +2 points", "baseline": 0.10, "mde": 0.02, "expect": 3841, "tolerance": 5 }
+  ],
+  "srm": [
+    { "name": "5000 vs 5200 is borderline", "args": [5000, 5200], "p": 0.0477 },
+    { "name": "5000 vs 5001 is fine", "args": [5000, 5001], "p": 0.9920 }
+  ]
+}

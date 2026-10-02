@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A/B Test Analyzer</title>
+<meta name="description" content="Did the variant really win? A free A/B test significance calculator, sample size planner and a simulator that shows why peeking at results early gives false wins.">
+<style>
+:root{--bg:#f7f5f0;--card:#fff;--ink:#1d2433;--muted:#5b6579;--line:#e3dfd5;--accent:#0f6b5e;--bad:#b4412f;--warn:#9a6700;--soft:#e8f3f0;--field:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1a202b;--ink:#e8ecf3;--muted:#9aa5b8;--line:#2a3242;--accent:#4fc4af;--bad:#ee8470;--warn:#e3b341;--soft:#17302c;--field:#12161d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:clamp(1.8rem,4vw,2.5rem);line-height:1.15;margin:.2em 0}
+h2{font-size:1.35rem;margin:2em 0 .4em}
+p{margin:.5em 0}.muted{color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{display:block;font-size:.88rem;color:var(--muted);margin-bottom:3px}
+input,select{width:100%;padding:9px 10px;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{font:inherit;font-weight:600;padding:10px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){button{color:#07201b}}
+button:disabled{opacity:.6;cursor:wait}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 8px}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:1.4rem;font-variant-numeric:tabular-nums}
+.verdict{border-left:4px solid var(--accent);background:var(--soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+.verdict.no{border-color:var(--warn)}
+.alert{border-left:4px solid var(--bad);padding:8px 14px;margin:10px 0;color:var(--bad);font-weight:600}
+.err{color:var(--bad);margin-top:8px}
+svg{display:block;width:100%;height:auto}svg text{fill:var(--muted);font-size:12px}
+.bars{margin-top:14px}.bar{display:grid;grid-template-columns:140px 1fr 64px;gap:10px;align-items:center;margin:7px 0;font-size:.95rem}
+.bar i{display:block;height:20px;border-radius:5px}
+.bar .nominal{background:var(--accent)}.bar .actual{background:var(--bad)}
+footer{margin-top:44px;color:var(--muted);font-size:.9rem}a{color:var(--accent)}
+@media (max-width:520px){.bar{grid-template-columns:1fr;gap:2px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="muted">A portfolio project by <a href="https://hamzamehmood46.github.io">Hamza Mehmood</a></p>
+<h1>Did the variant really win?</h1>
+<p class="muted">Type in the results of an A/B test. This tells you whether the difference is likely real, how big it could plausibly be, and whether the traffic split itself looks trustworthy. Everything runs in your browser; nothing is sent anywhere.</p>
+
+<h2>1. Analyze a test</h2>
+<form class="panel" id="test-form" autocomplete="off" novalidate>
+  <div class="grid">
+    <div><label for="na">Control: visitors</label><input id="na" type="number" min="1" step="1" value="2000"></div>
+    <div><label for="ca">Control: conversions</label><input id="ca" type="number" min="0" step="1" value="200"></div>
+    <div><label for="nb">Variant: visitors</label><input id="nb" type="number" min="1" step="1" value="2000"></div>
+    <div><label for="cb">Variant: conversions</label><input id="cb" type="number" min="0" step="1" value="240"></div>
+    <div><label for="conf">Confidence level</label>
+      <select id="conf"><option value="0.10">90%</option><option value="0.05" selected>95%</option><option value="0.01">99%</option></select></div>
+  </div>
+  <div id="test-error" class="err" role="alert"></div>
+  <div id="test-out" aria-live="polite"></div>
+</form>
+
+<h2>2. Plan a test: how many visitors do you need?</h2>
+<form class="panel" id="size-form" autocomplete="off" novalidate>
+  <div class="grid">
+    <div><label for="base">Current conversion rate (%)</label><input id="base" type="number" min="0.1" max="99" step="0.1" value="10"></div>
+    <div><label for="mde">Smallest lift worth detecting (points)</label><input id="mde" type="number" step="0.1" value="2"></div>
+    <div><label for="power">Power</label>
+      <select id="power"><option value="0.8" selected>80%</option><option value="0.9">90%</option></select></div>
+    <div><label for="perday">Visitors per day (optional)</label><input id="perday" type="number" min="0" step="1" placeholder="e.g. 400"></div>
+  </div>
+  <div id="size-error" class="err" role="alert"></div>
+  <div id="size-out" aria-live="polite"></div>
+</form>
+
+<h2>3. Why you should not peek</h2>
+<div class="panel">
+  <p>Imagine testing two <em>identical</em> versions. A properly run 95% test falsely announces a winner about 5% of the time. But if you check the results repeatedly and stop the moment it looks significant, you will be fooled far more often. This simulates 1,000 such no-difference tests.</p>
+  <div class="grid" style="max-width:420px">
+    <div><label for="looks">Times you check the results</label>
+      <select id="looks"><option>1</option><option>3</option><option>5</option><option selected>10</option><option>20</option></select></div>
+  </div>
+  <p><button id="sim" type="button">Run the simulation</button></p>
+  <div id="sim-out" aria-live="polite"></div>
+</div>
+
+<h2>What this does and does not do</h2>
+<div class="panel">
+  <ul>
+    <li>It compares two <b>conversion rates</b> with a two-sided two-proportion z-test (pooled for the test, unpooled for the interval). It is a good fit for large samples; with very few conversions per group, use an exact test.</li>
+    <li>"Significant" means unlikely to be chance. It does not mean the lift is big enough to matter: look at the interval.</li>
+    <li>The traffic-split check flags tests where assignment or logging may be broken (a very small p-value, below 0.001).</li>
+    <li>It does not handle multiple variants, revenue or other non-binary metrics, or sequential testing methods.</li>
+  </ul>
+</div>
+
+<footer>The same math is implemented in Python and JavaScript and tested against shared, hand-checked cases. <a href="https://github.com/hamzamehmood46/ab-test-analyzer">Source and tests on GitHub</a>.</footer>
+</div>
+
+<script type="module">
+import { zTest, sampleSizePerGroup, sampleRatioMismatch, peekingFalsePositiveRate } from "./stats.js";
+
+const $ = (id) => document.getElementById(id);
+const pct = (v, d = 2) => (v * 100).toFixed(d) + "%";
+const signedPts = (v) => (v >= 0 ? "+" : "") + (v * 100).toFixed(2);
+const fmtP = (p) => (p < 0.0001 ? "< 0.0001" : p.toFixed(4));
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+function stat(label, value) { const d = el("div", "stat"); d.append(el("span", "muted", label), el("b", "", value)); return d; }
+
+function ciChart(lo, hi, diff) {
+  const span = Math.max(Math.abs(lo), Math.abs(hi)) * 1.25 || 0.01;
+  const W = 700, H = 90, x = (v) => W / 2 + (v / span) * (W / 2 - 20);
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Confidence interval for the difference: ${signedPts(lo)} to ${signedPts(hi)} percentage points`);
+  const add = (name, attrs, text) => { const n = document.createElementNS(ns, name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text) n.textContent = text; svg.append(n); };
+  const color = lo > 0 ? "var(--accent)" : hi < 0 ? "var(--bad)" : "var(--warn)";
+  add("line", { x1: x(0), x2: x(0), y1: 8, y2: 56, stroke: "currentColor", "stroke-opacity": ".5", "stroke-dasharray": "4 3" });
+  add("line", { x1: x(lo), x2: x(hi), y1: 32, y2: 32, stroke: color, "stroke-width": 6, "stroke-linecap": "round" });
+  add("circle", { cx: x(diff), cy: 32, r: 7, fill: color });
+  add("text", { x: x(0), y: 74, "text-anchor": "middle" }, "no difference");
+  add("text", { x: Math.max(30, x(lo)), y: 20, "text-anchor": "middle" }, signedPts(lo));
+  add("text", { x: Math.min(W - 30, x(hi)), y: 20, "text-anchor": "middle" }, signedPts(hi));
+  svg.style.color = "var(--ink)";
+  return svg;
+}
+
+function analyze() {
+  const out = $("test-out"), err = $("test-error");
+  out.replaceChildren(); err.textContent = "";
+  const vals = ["ca", "na", "cb", "nb"].map((id) => Number($(id).value));
+  const alpha = Number($("conf").value);
+  let r;
+  try {
+    if (vals.some((v) => !Number.isInteger(v))) throw new RangeError("Please enter whole numbers in all four fields.");
+    r = zTest(vals[0], vals[1], vals[2], vals[3], alpha);
+  } catch (e) { err.textContent = e.message; return; }
+
+  const conf = Math.round((1 - alpha) * 100);
+  const stats = el("div", "stats");
+  stats.append(
+    stat("Control rate", pct(r.rateA)), stat("Variant rate", pct(r.rateB)),
+    stat("Lift (points)", signedPts(r.absLift)),
+    stat("Relative lift", r.relLift === null ? "n/a" : (r.relLift >= 0 ? "+" : "") + (r.relLift * 100).toFixed(1) + "%"),
+    stat("p-value", fmtP(r.p)),
+  );
+  const verdict = el("div", r.significant ? "verdict" : "verdict no");
+  if (r.significant && r.absLift > 0) {
+    verdict.textContent = `The variant won. The difference is unlikely to be chance at ${conf}% confidence. Plausibly it is worth between ${signedPts(r.ciLow)} and ${signedPts(r.ciHigh)} percentage points, so decide whether even the low end is worth shipping.`;
+  } else if (r.significant) {
+    verdict.textContent = `The variant did worse. The drop is unlikely to be chance at ${conf}% confidence (plausibly ${signedPts(r.ciLow)} to ${signedPts(r.ciHigh)} points).`;
+  } else {
+    verdict.textContent = `No clear winner. At ${conf}% confidence the data fits anything from ${signedPts(r.ciLow)} to ${signedPts(r.ciHigh)} points, including no change. That is not proof the variant does nothing; it may need more traffic (see the planner below).`;
+  }
+  out.append(stats, verdict, el("p", "muted", `${conf}% confidence interval for the difference (variant minus control), in percentage points:`), ciChart(r.ciLow, r.ciHigh, r.absLift));
+
+  const srm = sampleRatioMismatch(vals[1], vals[3]);
+  if (srm < 0.001) {
+    out.append(el("div", "alert", `Warning: the traffic split looks wrong (${vals[1].toLocaleString()} vs ${vals[3].toLocaleString()} visitors, p = ${srm < 1e-4 ? "< 0.0001" : srm.toFixed(4)}). If you planned an even split, assignment or logging may be broken, and this result cannot be trusted until that is understood.`));
+  }
+}
+
+function plan() {
+  const out = $("size-out"), err = $("size-error");
+  out.replaceChildren(); err.textContent = "";
+  const base = Number($("base").value) / 100, mde = Number($("mde").value) / 100;
+  const alpha = Number($("conf").value), power = Number($("power").value), perDay = Number($("perday").value);
+  let n;
+  try { n = sampleSizePerGroup(base, mde, alpha, power); } catch (e) { err.textContent = e.message; return; }
+  const stats = el("div", "stats");
+  stats.append(stat("Per group", n.toLocaleString()), stat("Total", (2 * n).toLocaleString()));
+  if (perDay > 0) stats.append(stat("Days to run", Math.ceil((2 * n) / perDay).toLocaleString()));
+  out.append(stats, el("p", "muted", `To detect a move from ${pct(base, 1)} to ${pct(base + mde, 1)} with ${Math.round(power * 100)}% power at ${Math.round((1 - alpha) * 100)}% confidence. Decide the number in advance, then wait for it.`));
+}
+
+async function simulate() {
+  const btn = $("sim"), out = $("sim-out");
+  btn.disabled = true; btn.textContent = "Running…";
+  await new Promise((r) => setTimeout(r, 30)); // let the button repaint before the CPU-bound loop
+  const looks = Number($("looks").value);
+  const rate = peekingFalsePositiveRate({ trials: 1000, looks, perLook: 200, seed: 7 });
+  out.replaceChildren();
+  const bars = el("div", "bars");
+  const row = (label, v, cls) => {
+    const d = el("div", "bar"); const track = el("span"); const i = el("i", cls); i.style.width = Math.max(2, Math.min(100, v * 250)) + "%"; track.append(i);
+    d.append(el("span", "", label), track, el("span", "", (v * 100).toFixed(1) + "%")); return d;
+  };
+  bars.append(row("What it should be", 0.05, "nominal"), row(`After ${looks} check${looks > 1 ? "s" : ""}`, rate, "actual"));
+  out.append(bars, el("p", "", looks === 1
+    ? "With a single, pre-planned look the false-win rate stays close to the promised 5%."
+    : `Checking ${looks} times and stopping at the first "significant" result declares a winner in ${(rate * 100).toFixed(1)}% of tests where nothing changed. Plan the sample size first, then look once.`));
+  btn.disabled = false; btn.textContent = "Run the simulation again";
+}
+
+$("test-form").addEventListener("input", () => { analyze(); plan(); });
+$("size-form").addEventListener("input", plan);
+$("test-form").addEventListener("submit", (e) => e.preventDefault());
+$("size-form").addEventListener("submit", (e) => e.preventDefault());
+$("sim").addEventListener("click", simulate);
+analyze(); plan();
+</script>
+</body>
+</html>
